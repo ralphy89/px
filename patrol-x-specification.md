@@ -1,4 +1,4 @@
-# 🚨 Patrol-X — Project Specification (Workflow + Architecture)
+# Patrol-X — Project Specification (Workflow + Architecture)
 
 ## 📌 Overview
 Patrol-X is an intelligent real-time information analysis system that collects content from multiple sources, filters relevance, summarizes key points, and suggests appropriate actions to help users make informed and rapid decisions in critical or everyday contexts.
@@ -135,34 +135,25 @@ Storage + Logs + Feedback Loop
 ---
 
 ## 🏗️ System Architecture Diagram
-
 ```mermaid
 flowchart TD
 
-A[External Sources
-WhatsApp | X | RSS | User Reports] --> B[Ingestion Layer
-Webhooks/APIs]
+A[External Sources<br/>WhatsApp<br/>X<br/>RSS<br/>User Reports] --> B[Ingestion Layer<br/>Webhooks/APIs]
 
-B --> C[Pre-Processing
-Cleaning, Lang Detect, Normalization]
+B --> C[Pre-Processing<br/>Cleaning<br/>Language Detection<br/>Normalization]
 
-C --> D[AI Analysis Layer
-Classification, Summarization, Recommendations]
+C --> D[AI Analysis Layer<br/>Classification<br/>Summarization<br/>Recommendations]
 
-D --> E[Decision Engine
-Rules + Thresholds]
+D --> E[Decision Engine<br/>Rules + Thresholds]
 
-E --> F[Storage & Logs
-PostgreSQL + Redis]
+E --> F[Storage & Logs<br/>PostgreSQL + Redis]
 
-F --> G[Dashboard
-Web App + Realtime WS]
+F --> G[Dashboard<br/>Web App + Realtime WS]
 
-F --> H[Notifications
-WhatsApp | SMS | Email | Push]
+F --> H[Notifications<br/>WhatsApp<br/>SMS<br/>Email<br/>Push]
 
-G <-- I[Chatbot Assistant
-Q&A + Incident Reporting]
+I[Chatbot Assistant<br/>Q&A<br/>Incident Reporting] --> G
+
 ```
 
 ---

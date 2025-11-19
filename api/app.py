@@ -113,9 +113,10 @@ def execute():
             print("Answer sent to the client")
             return answer
         except Exception as e:
-            abort(404)
+            print(e)
+            abort(400)
            
     else:
-        return str(os.environ['HF_TOKEN'])
+        abort(404)
 
 # print(execute(messages))

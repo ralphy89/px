@@ -1,8 +1,8 @@
 import os
 import json
-from flask import Flask, abort, request
+from flask import Flask, abort, jsonify, request
 from openai import OpenAI
-
+import re
 app = Flask(__name__)
 POST = 'POST'
 GET = 'GET'
@@ -94,29 +94,41 @@ client = OpenAI(
 def home():
     return "<h1>Welcome To Patrol-X</h1>"
 
-@app.route('/chat', methods=[POST])
+@app.route("/chat", methods=["POST"])
 def execute():
-    if request.method == POST:
-        if not request.is_json:
-                abort(400, description="Expected JSON body")
-        try:
-            messages = list(request.json['prompt'])
-            prompt = f"{PROMPT}\n{messages}"
-            print("Thinking.........")
-            completion = client.chat.completions.create(
-                model=model_list[1],
-                response_format={"type": "json_object"},
-                messages=[{"role": "user", "content": prompt}]
-            )
+    if not request.is_json:
+        abort(400, description="Expected JSON body")
 
-            answer = completion.choices[0].message.content
-            print("Answer sent to the client")
-            return answer
-        except Exception as e:
-            print(e)
-            abort(400)
-           
-    else:
-        abort(404)
+    try:
+        messages = request.json.get("prompt")
+        if not messages:
+            abort(400, description="Missing 'prompt'")
+
+        if isinstance(messages, list):
+            prompt_text = f"{PROMPT}\n{json.dumps(messages, ensure_ascii=False)}"
+        else:
+            prompt_text = f"{PROMPT}\n{messages}"
+
+        completion = client.chat.completions.create(
+            model=model_list[1],
+            response_format={"type": "json_object"},
+            messages=[{"role": "user", "content": prompt_text}]
+        )
+
+        answer = completion.choices[0].message.content
+
+        # Remove ```json ... ``` fencing if present
+        cleaned = re.sub(r"^```json\s*|\s*```$", "", answer.strip())
+
+        # Parse into Python dict
+        parsed = json.loads(cleaned)
+
+        # Return as proper JSON response
+        return jsonify(parsed)
+
+    except Exception as e:
+        print("Error:", e)
+        abort(400, description=str(e))
+
 
 # print(execute(messages))

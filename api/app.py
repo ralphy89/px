@@ -1,6 +1,5 @@
 import os
 import json
-from pyexpat.errors import messages
 from flask import Flask, abort, request
 from openai import OpenAI
 
@@ -66,10 +65,13 @@ Messages to analyze:
 """
 model_list = ['openai/gpt-oss-120b','deepseek-ai/DeepSeek-V3']
 
+HF_TOKEN = os.environ.get("HF_TOKEN")
+if not HF_TOKEN:
+    raise RuntimeError("Missing HF_TOKEN environment variable")
 
 client = OpenAI(
     base_url="https://router.huggingface.co/v1",
-    api_key=os.environ["HF_TOKEN"],
+    api_key=HF_TOKEN,
 )
 
 # messages = [
@@ -92,13 +94,12 @@ client = OpenAI(
 def home():
     return "<h1>Welcome To Patrol-X</h1>"
 
-
-
 @app.route('/chat', methods=[POST])
 def execute():
     if request.method == POST:
+        if not request.is_json:
+                abort(400, description="Expected JSON body")
         try:
-            
             messages = list(request.json['prompt'])
             prompt = f"{PROMPT}\n{messages}"
             print("Thinking.........")
@@ -108,13 +109,14 @@ def execute():
                 messages=[{"role": "user", "content": prompt}]
             )
 
-            answer = completion.choices[0].message.content
+            content = completion.choices[0].message.content
             print("Answer sent to the client")
-            return answer
+            return content, 200, {"Content-Type": "application/json"}
+
         except Exception as e:
             print(e)
            
     else:
-        return str(os.environ['HF_TOKEN'])
+        abort(404)
 
 # print(execute(messages))

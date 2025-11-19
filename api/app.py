@@ -96,8 +96,6 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def execute():
-    if not request.is_json:
-        abort(400, description="Expected JSON body")
 
     try:
         messages = request.json.get("prompt")

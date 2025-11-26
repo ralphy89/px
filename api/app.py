@@ -1,12 +1,14 @@
 import json
 from flask import Flask, abort, request
+from flask_cors import CORS
 from .services import *
 from .db.models import *
 
 app = Flask(__name__)
+CORS(app, origins=["*"])
+
 POST = 'POST'
 GET = 'GET'
-
 
 @app.route('/')
 def home():

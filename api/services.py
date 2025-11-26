@@ -2,7 +2,7 @@ import json
 import os
 from flask import abort
 from openai import OpenAI
-from utils import strip_markdown_fences
+from .utils import strip_markdown_fences
 PREPROCESS_PROMPT = f"""
 
 You are ChatGPT-5.1, an advanced AI specialized in deep message analysis with full adaptation to the Haitian context.

@@ -8,20 +8,6 @@ POST = 'POST'
 GET = 'GET'
 
 
-# messages = [
-#     "Kidnaping au niveau de Siloe",
-#     # "Bòn fèt jodi a frè m nan!",
-#     # "Dlo ap monte anpil bò Gonaïves yo.",
-# ]
-
-
-# for model in model_list:
-#   completion = client.chat.completions.create(
-#       model=model,
-#       response_format={"type": "json_object"},
-#       messages=[{"role": "user", "content": prompt}]
-#   )
-
 @app.route('/')
 def home():
     return "<h1>Welcome To Patrol-X</h1>"

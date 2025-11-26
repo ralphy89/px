@@ -1,6 +1,6 @@
 import json
 from flask import Flask, abort, request
-from services import *
+from .services import *
 from db.models import *
 
 app = Flask(__name__)

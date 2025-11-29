@@ -204,16 +204,13 @@ def receive_messages():
         if not isinstance(raw_messages, list):
             abort(400, description="'messages' must be a list")
 
-        # 1. Pré-traitement avec DeepSeek-V3
-        preprocessed_messages = preprocess_msg(raw_messages)
-        # 2. Analyse profonde avec GPT-OSS-120B
-        analysed_events = analyse_msg(preprocessed_messages)
         
-        # 3. Stockage dans la DB
+        preprocessed_messages = preprocess_msg(raw_messages)
+        analysed_events = analyse_msg(preprocessed_messages)
         save_result = save_event(analysed_events)
 
         if save_result and save_result.get('result'):
-            # 4. Create notifications for all active users
+            # Create notifications for all active users
             from .db.models import get_all_active_users, create_notification
             
             saved_events = save_result.get('events', [])

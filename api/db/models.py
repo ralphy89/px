@@ -5,7 +5,7 @@ from pymongo.server_api import ServerApi
 from datetime import UTC, datetime, timedelta
 
 
-uri = f"mongodb+srv://{os.environ.get('DB_USERNAME')}:{os.environ.get('DB_PASSWORD')}@px-test.amaelqi.mongodb.net/?appName=px-test"
+uri = f"mongodb+srv://{os.environ.get('DB_USERNAME')}:{os.environ.get('DB_PASSWORD')}@px-prod.amaelqi.mongodb.net/?appName=px-test"
 print(uri)
 # Create a new client and connect to the server
 client = MongoClient(uri, server_api=ServerApi('1'))
@@ -17,8 +17,7 @@ except Exception as e:
     print(e)
 
 
-db = client.test
-recipe = db['recipe']
+db = client.production
 
 event_collection = db['events']
 processed_messages_collection = db['processed_messages']

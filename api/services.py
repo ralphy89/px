@@ -5,7 +5,7 @@ from openai import OpenAI
 from pydantic.types import T
 from .utils import strip_markdown_fences
 from .db.models import *
-                         
+from datetime import datetime, UTC, timedelta                   
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
 if not HF_TOKEN:
@@ -39,7 +39,7 @@ def preprocess_chat_prompt(message):
         completion = client.chat.completions.create(
             response_format={"type": "json_object"},
             model=model_list[1],
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+            messages=[{"role": "system", "content": system_prompt  + "\n\nToday's date: " + datetime.now(UTC).strftime("%Y-%m-%d")}, {"role": "user", "content": user_prompt}]
         )
         preprocessed_msg = strip_markdown_fences(completion.choices[0].message.content)
         print(f"Preprocessed message: {preprocessed_msg}")
@@ -69,7 +69,7 @@ def analyse_chat_prompt(preprocessed_message):
         
         completion = client.chat.completions.create(
             model=model_list[0],
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+            messages=[{"role": "system", "content": system_prompt + "\n\nToday's date: " + datetime.now(UTC).strftime("%Y-%m-%d")}, {"role": "user", "content": user_prompt}]
         )
 
         analysed_msg = completion.choices[0].message.content
@@ -166,6 +166,8 @@ def get_summary_prompt(events_list, location):
     - "Zones concernées :"
     - "Sources mentionnées : …"
 
+    Today's date: {datetime.now(UTC).strftime("%Y-%m-%d")}
+
     Produce ONLY the final summary.
     """
 
@@ -246,7 +248,7 @@ def analyse_msg(preprocessed_msg: dict):
             model=model_list[0],  # GPT-OSS-120B MUST be here, not DeepSeek
             response_format={"type": "json_object"},
             messages=[
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": system_prompt + "\n\nToday's date: " + datetime.now(UTC).strftime("%Y-%m-%d")},
                 {"role": "user", "content": user_prompt}
             ]
         )

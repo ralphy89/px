@@ -2,6 +2,7 @@ import json
 import os
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+from datetime import UTC, datetime, timedelta
 
 
 uri = f"mongodb+srv://{os.environ.get('DB_USERNAME')}:{os.environ.get('DB_PASSWORD')}@px-test.amaelqi.mongodb.net/?appName=px-test"
@@ -22,18 +23,138 @@ recipe = db['recipe']
 event_collection = db['events']
 processed_messages_collection = db['processed_messages']
 
-def get_events_for_chat(preprocessed_message):
-    return list(
-        event_collection.find(
-            {
-                "location": {
-                    "$regex": preprocessed_message['location'],
-                    "$options": "i"   # case-insensitive
-                },
-            },
-            {"_id": 0}
+
+def get_time_cutoff(time_range):
+    """Convert time_range string to datetime cutoff."""
+    now = datetime.now(UTC)
+    
+    if time_range == "today":
+        # Start of today in UTC
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_range == "yesterday":
+        # Start of yesterday in UTC
+        yesterday = now - timedelta(days=1)
+        return yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_range == "last_24h":
+        return now - timedelta(hours=24)
+    elif time_range == "last_week":
+        return now - timedelta(days=7)
+    else:  # "any"
+        return None
+
+
+def build_location_query(location, location_is_general):
+    """Build MongoDB query for location filtering, respecting hierarchy."""
+    if not location:
+        return {}
+    
+    # Hierarchical zones that support parent → subzone
+    hierarchical_zones = {
+        "Delmas": ["Delmas"],
+        "Tabarre": ["Tabarre", "Clercine", "Klèsin"],
+        "Pétion-Ville": ["Pétion-Ville", "Petionville", "Petyonvil", "PV"],
+        "Croix-des-Bouquets": ["Croix-des-Bouquets", "Kwadebouke", "Bon Repos"],
+        "Pèlerin": ["Pèlerin", "Pelerin"],
+        "Thomassin": ["Thomassin"],
+        "Canapé-Vert": ["Canapé-Vert", "Kanapevè"],
+        "Laboule": ["Laboule", "Laboul"]
+    }
+    
+    # Normalize location name
+    location_normalized = location.strip()
+    
+    # Check if this is a hierarchical parent
+    if location_is_general:
+        # Find matching parent zone
+        for parent, variants in hierarchical_zones.items():
+            if any(location_normalized.lower() == v.lower() for v in variants):
+                # Build regex to match parent and all subzones
+                # e.g., "Delmas" should match "Delmas", "Delmas 19", "Delmas 33", etc.
+                # Pattern: ^Delmas($|\s|\s\d+)
+                parent_pattern = parent.replace("-", "\\-")  # Escape hyphens
+                regex_pattern = f"^{parent_pattern}($|\\s|\\s\\d+)"
+                return {"location": {"$regex": regex_pattern, "$options": "i"}}
+        
+        # If not found in hierarchical list, treat as exact match
+        return {"location": {"$regex": f"^{location_normalized.replace('-', '\\-')}$", "$options": "i"}}
+    else:
+        # Specific subzone or non-hierarchical zone - exact match
+        # Escape special regex characters
+        escaped_location = location_normalized.replace("-", "\\-")
+        return {"location": {"$regex": f"^{escaped_location}$", "$options": "i"}}
+
+
+def get_events_for_chat(query_params):
+    """
+    Flexible query function that supports multiple filters.
+    
+    Args:
+        query_params (dict): Contains:
+            - location (str or None): Location to filter by
+            - location_is_general (bool): Whether location is a parent zone
+            - event_types (list): List of event types to filter by
+            - severity (str or None): Severity level to filter by
+            - time_range (str): "today", "yesterday", "last_24h", "last_week", "any"
+            - query_type (str): Type of query for logging
+    
+    Returns:
+        list: List of matching events
+    """
+    try:
+        # Build MongoDB query
+        query = {}
+        
+        # Location filter (normalize empty strings to None)
+        location = query_params.get('location')
+        if location and location.strip():
+            location_query = build_location_query(
+                location,
+                query_params.get('location_is_general', False)
+            )
+            query.update(location_query)
+        
+        # Event type filter
+        event_types = query_params.get('event_types', [])
+        if event_types and len(event_types) > 0:
+            query['event_type'] = {"$in": event_types}
+        
+        # Severity filter (include the specified severity and higher)
+        severity = query_params.get('severity')
+        if severity:
+            severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+            severity_level = severity_order.get(severity.lower(), 3)
+            # Include all severities at or above the requested level
+            allowed_severities = [
+                s for s, level in severity_order.items() 
+                if level <= severity_level
+            ]
+            query['severity'] = {"$in": allowed_severities}
+        
+        # Time range filter
+        time_range = query_params.get('time_range', 'any')
+        cutoff = get_time_cutoff(time_range)
+        if cutoff:
+            # MongoDB can compare ISO strings directly, but we'll use string format for consistency
+            cutoff_str = cutoff.isoformat()
+            query['timestamp_start'] = {"$gte": cutoff_str}
+        
+        print(f"Query params: {query_params}")
+        print(f"MongoDB query: {query}")
+        
+        # Execute query
+        results = list(
+            event_collection.find(query, {"_id": 0})
+            .sort("timestamp_start", -1)
+            .limit(100)  # Limit to prevent huge responses
         )
-    )
+        
+        print(f"Found {len(results)} events")
+        return results
+        
+    except Exception as e:
+        print(f"Error querying events: {e}")
+        return []
+
 
 def save_processed_messages(preprocessed_message):
     try:
@@ -42,18 +163,20 @@ def save_processed_messages(preprocessed_message):
     except Exception as e:
         raise e
 
+
 def save_event(analysed_events):
     try:
         result = event_collection.insert_many(analysed_events['events'])
-
         return result
     except Exception as e:
         raise e
-   
 
-from datetime import UTC, datetime, timedelta
 
 def query_events_by_location(location):
+    """
+    Legacy function for backward compatibility.
+    Queries events by location (last 24h).
+    """
     cutoff = datetime.now(UTC) - timedelta(hours=24)
 
     return list(
@@ -63,23 +186,33 @@ def query_events_by_location(location):
                     "$regex": location,
                     "$options": "i"   # case-insensitive
                 },
-                # "timestamp_start": {"$gte": cutoff}
             },
             {"_id": 0}
         ).sort("timestamp_start", -1)
     )
 
+
 def query_events(mode="limit", limit=100):
+    """
+    Query events with different modes.
+    
+    Args:
+        mode: "latest", "limit", or "last_24h"
+        limit: Maximum number of events to return (for "limit" mode)
+    
+    Returns:
+        Event(s) matching the query
+    """
     if mode == "latest":
         return event_collection.find_one(
-            {}, {"_id":0},
+            {}, {"_id": 0},
             sort=[("timestamp_start", -1)]
         )
     
     if mode == "limit":
         return list(
             event_collection.find(
-                {}, {"_id":0}
+                {}, {"_id": 0}
             )
             .sort("timestamp_start", -1)
             .limit(limit)
@@ -87,14 +220,13 @@ def query_events(mode="limit", limit=100):
 
     if mode == "last_24h":
         cutoff = datetime.now(UTC) - timedelta(hours=24)
-        print(cutoff)
+        cutoff_str = cutoff.isoformat()
+        print(cutoff_str)
         return list(
             event_collection.find({
-                "timestamp_start": {"$gte": cutoff}
+                "timestamp_start": {"$gte": cutoff_str}
             },
-            {"_id":0}).sort("timestamp_start", -1)
+            {"_id": 0}).sort("timestamp_start", -1)
         )
 
-
     return []
-

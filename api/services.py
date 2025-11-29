@@ -32,44 +32,140 @@ GPT_CHAT_SYSTEM_PROMPT = os.path.join(BASE_DIR, "prompts/system/gpt_for_chat.txt
 
 
 def preprocess_chat_prompt(message):
+    """
+    Preprocess user message to extract query parameters.
+    
+    Args:
+        message (str): User's question/prompt
+    
+    Returns:
+        dict: Extracted query parameters including:
+            - query_type: Type of query (location, event_type, severity, general, etc.)
+            - location: Location string or null
+            - location_is_general: Whether location is a parent zone
+            - event_types: List of event types or empty list
+            - severity: Severity level or null
+            - time_range: Time range filter
+            - language: Detected language (ht, fr, en)
+            - original_question: Original user question
+    """
     try:
         system_prompt = load_prompt(DEEPSEEK_CHAT_SYSTEM_PROMPT)
         user_prompt = f"User question: {message}"
         print(f"Preprocessing User prompt: {user_prompt}")
+        
         completion = client.chat.completions.create(
             response_format={"type": "json_object"},
-            model=model_list[1],
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+            model=model_list[1],  # DeepSeek-V3
+            messages=[
+                {"role": "system", "content": system_prompt}, 
+                {"role": "user", "content": user_prompt}
+            ]
         )
+        
         preprocessed_msg = strip_markdown_fences(completion.choices[0].message.content)
         print(f"Preprocessed message: {preprocessed_msg}")
-        return json.loads(preprocessed_msg)
+        
+        query_params = json.loads(preprocessed_msg)
+        
+        # Ensure all required fields exist with defaults
+        query_params.setdefault('query_type', 'general')
+        query_params.setdefault('location', None)
+        query_params.setdefault('location_is_general', False)
+        query_params.setdefault('event_types', [])
+        query_params.setdefault('severity', None)
+        query_params.setdefault('time_range', 'any')
+        query_params.setdefault('language', 'ht')
+        query_params.setdefault('original_question', message)
+        
+        return query_params
+        
     except Exception as e:
         print(f"Error preprocessing chat prompt: {e}")
-        return None
- 
+        # Return default query params on error
+        return {
+            'query_type': 'general',
+            'location': None,
+            'location_is_general': False,
+            'event_types': [],
+            'severity': None,
+            'time_range': 'any',
+            'language': 'ht',
+            'original_question': message
+        }
+
+
+def format_events_for_rag(events):
+    """
+    Format events list into readable RAG context string.
+    
+    Args:
+        events (list): List of event dictionaries
+    
+    Returns:
+        str: Formatted events string or "NO_EVENTS"
+    """
+    if not events or len(events) == 0:
+        return "NO_EVENTS"
+    
+    formatted_events = []
+    for e in events:
+        event_str = f"- [{e.get('timestamp_start', 'Unknown time')}] {e.get('summary', 'No summary')} "
+        event_str += f"(Type: {e.get('event_type', 'unknown')}, "
+        event_str += f"Severity: {e.get('severity', 'unknown')}, "
+        event_str += f"Location: {e.get('location', 'unknown')}"
+        
+        if e.get('sources'):
+            event_str += f", Sources: {e.get('sources')}"
+        
+        if e.get('recommended_action'):
+            event_str += f", Action: {e.get('recommended_action')}"
+        
+        event_str += ")"
+        formatted_events.append(event_str)
+    
+    return "\n".join(formatted_events)
 
 
 def analyse_chat_prompt(preprocessed_message):
+    """
+    Analyze user query and generate response using GPT-OSS-120B.
+    
+    Args:
+        preprocessed_message (dict): Query parameters from preprocessing
+    
+    Returns:
+        str: Generated response in the detected language
+    """
     try:
         system_prompt = load_prompt(GPT_CHAT_SYSTEM_PROMPT)
-
-        if preprocessed_message['location'] == "":
-            return "Please provide a location to get the events."
-      
+        
+        # Query events based on extracted parameters
+        events = get_events_for_chat(preprocessed_message)
+        events_context = format_events_for_rag(events)
+        
+        # Build user prompt with context
         user_prompt = f"""
-            User question context (DeepSeek):
-            {preprocessed_message}
+User question context (extracted parameters):
+{json.dumps(preprocessed_message, ensure_ascii=False, indent=2)}
 
-            Database events:
-            {get_events_for_chat(preprocessed_message)}
+Database events (RAG context):
+{events_context}
 
-            Respond in the language used in the user question.
-            """
+Original user question: "{preprocessed_message.get('original_question', '')}"
+
+Respond in {preprocessed_message.get('language', 'ht')} language.
+"""
+        
+        print(f"Query type: {preprocessed_message.get('query_type')}")
+        print(f"Events found: {len(events)}")
         
         completion = client.chat.completions.create(
-            model=model_list[0],
-            messages=[{"role": "system", "content": system_prompt }, {"role": "user", "content": user_prompt}]
+            model=model_list[0],  # GPT-OSS-120B
+            messages=[
+                {"role": "system", "content": system_prompt}, 
+                {"role": "user", "content": user_prompt}
+            ]
         )
 
         analysed_msg = completion.choices[0].message.content
@@ -77,14 +173,50 @@ def analyse_chat_prompt(preprocessed_message):
        
     except Exception as e:
         print(f"Error analysing chat prompt: {e}")
-        return None
+        # Return helpful error message in detected language
+        lang = preprocessed_message.get('language', 'ht')
+        if lang == 'ht':
+            return "Désolé, mwen pa ka reponn kèksyon ou a kounye a. Tanpri eseye ankò."
+        elif lang == 'fr':
+            return "Désolé, je n'ai pas pu traiter votre question. Veuillez réessayer."
+        else:
+            return "Sorry, I couldn't process your question. Please try again."
+
 
 def chat_with_gpt(message):
+    """
+    Main chat function that processes user messages.
+    
+    Args:
+        message (str): User's question/prompt
+    
+    Returns:
+        dict: Response with status and answer
+    """
     print(f"Chat with GPT: {message}")
+    
+    # Step 1: Preprocess to extract query parameters
     preprocessed_msg = preprocess_chat_prompt(message)
+    
+    if not preprocessed_msg:
+        return {
+            "status": "error",
+            "answer": "Error preprocessing your question. Please try again."
+        }
+    
+    # Step 2: Analyze and generate response
     analysed_msg = analyse_chat_prompt(preprocessed_msg)
-    # return {"status": "ok", "answer":analysed_msg}
-    return {"status": "ok", "answer": analysed_msg}
+    
+    if not analysed_msg:
+        return {
+            "status": "error",
+            "answer": "Error generating response. Please try again."
+        }
+    
+    return {
+        "status": "ok",
+        "answer": analysed_msg
+    }
 
 def get_summary_prompt(events_list, location):
     # Build RAG context from events

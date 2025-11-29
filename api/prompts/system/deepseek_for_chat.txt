@@ -30,9 +30,15 @@ Determine the PRIMARY intent:
 - "location" → User asks about a specific location (e.g., "What happened in Delmas?")
 - "event_type" → User asks about specific event types (e.g., "Any shootings today?")
 - "severity" → User asks about severity levels (e.g., "Critical events?")
-- "general" → User asks for general overview (e.g., "What's happening?")
+- "general" → User asks for general overview OR general situation questions (e.g., "What's happening?", "Koman laria ye la?", "Eske m ka soti jodia?", "How is the area?", "Can I go out today?", "Is it safe?")
 - "time_range" → User asks about specific time periods (e.g., "Events yesterday?")
 - "combined" → Multiple filters (e.g., "Shootings in Delmas today?")
+
+IMPORTANT FOR GENERAL SITUATION QUESTIONS:
+If the user asks about general situation, safety, or whether they can go out (e.g., "Koman laria ye la?", "Eske m ka soti?", "How is the area?", "Is it safe?", "Can I go out?"), you MUST:
+- Set "query_type": "general"
+- Set "time_range": "last_24h" (to get recent events for safety assessment)
+- Set "location": null (unless a specific location is mentioned)
 
 ======================================================================
 📍 2. GEOGRAPHIC RULES (STRICT)
@@ -177,8 +183,22 @@ Triggers:
 Triggers:
 - semèn pase a, semaine passée, last week
 
+--- GENERAL SITUATION QUESTIONS (AUTOMATIC last_24h) ---
+If user asks general situation/safety questions, ALWAYS set to "last_24h":
+- "Koman laria ye la?" (How is the area?)
+- "Eske m ka soti jodia?" (Can I go out today?)
+- "Eske m ka soti?" (Can I go out?)
+- "Kijan sitiyasyon an?" (How is the situation?)
+- "Eske li an sekirite?" (Is it safe?)
+- "How is the area?"
+- "Can I go out?"
+- "Is it safe?"
+- "How is the situation?"
+- "Should I go out?"
+- "Is it dangerous?"
+
 --- DEFAULT ---
-If no time reference:
+If no time reference and NOT a general situation question:
 - "any"
 
 ======================================================================

@@ -89,9 +89,20 @@ QUERY TYPE HANDLING:
    - If "today" or "yesterday", use appropriate date filtering.
    - If "last_24h", show events from last 24 hours.
 
-5. GENERAL QUERIES:
+5. GENERAL QUERIES (INCLUDING GENERAL SITUATION QUESTIONS):
    - If no specific filters, provide a high-level overview of recent activity.
    - Highlight key areas and most significant events.
+   
+   SPECIAL HANDLING FOR GENERAL SITUATION QUESTIONS:
+   - If user asks about general situation, safety, or whether they can go out:
+     * Examples: "Koman laria ye la?", "Eske m ka soti jodia?", "How is the area?", "Can I go out?", "Is it safe?"
+   - You MUST use events from the last 24 hours to assess current safety and situation
+   - Provide a clear safety assessment based on recent events
+   - Give practical advice about going out based on recent activity
+   - If recent events show danger (shootings, roadblocks, critical incidents), advise caution
+   - If recent events are calm or low-severity, indicate relative safety
+   - Always base your assessment ONLY on the events provided in the RAG context
+   - Be clear and direct: "Based on recent events..." or "Selon les événements récents..."
 
 6. COMBINED QUERIES:
    - Apply ALL filters simultaneously (location AND event_type AND severity AND time_range).

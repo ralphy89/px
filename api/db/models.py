@@ -5,6 +5,7 @@ from pymongo.server_api import ServerApi
 from datetime import UTC, datetime, timedelta
 
 
+
 uri = f"mongodb+srv://{os.environ.get('DB_USERNAME')}:{os.environ.get('DB_PASSWORD')}@px-test.amaelqi.mongodb.net/?appName=px-test"
 print(uri)
 # Create a new client and connect to the server

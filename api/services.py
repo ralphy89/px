@@ -9,10 +9,7 @@ from .db.models import *
 from datetime import datetime, UTC, timedelta                   
 
 
-# Grok AI (xAI) API configuration
-# Get your API key from https://console.x.ai/
-# Set it as environment variable: export GROK_API_KEY="your-api-key-here"
-# Or set it as: export XAI_API_KEY="your-api-key-here"
+
 
 GROK_TOKEN = os.environ.get("GROK_TOKEN")
 if not GROK_TOKEN:
@@ -28,10 +25,7 @@ client = OpenAI(
     api_key=GROK_TOKEN,
 )
 
-# Grok model names - using Grok for all operations
-# Available models: grok-beta, grok-2, grok-2-1212, grok-2-vision-1212
-# Using grok-2 for all operations (most capable model)
-# Alternative: Use grok-beta for faster preprocessing if needed
+
 model_list = ['grok-4-1-fast-reasoning', 'grok-4-fast-reasoning']  # [analysis_model, preprocessing_model] - both use grok-2
 
 def load_prompt(path):
@@ -231,7 +225,7 @@ def get_event_embeddings_grok(events):
         searchable_texts = [create_event_searchable_text(e) for e in events]
         
         # Try different Grok embedding models
-        embedding_models = ["grok-2-1212", "grok-2", "grok-beta"]
+        embedding_models = ["grok-code-fast-1"]
         
         for model_name in embedding_models:
             try:
@@ -378,9 +372,113 @@ def get_events_with_vector_search(query_params, original_question):
         return candidate_events[:15] if len(candidate_events) > 15 else candidate_events
 
 
+def is_patrolx_related(query_params, original_question):
+    """
+    Determine if the user's question is related to Patrol-X (events, locations, security, etc.).
+    
+    Args:
+        query_params (dict): Extracted query parameters
+        original_question (str): Original user question
+    
+    Returns:
+        bool: True if question is Patrol-X related, False otherwise
+    """
+    # Check if any Patrol-X specific parameters were extracted
+    has_location = query_params.get('location') and query_params.get('location').strip()
+    has_event_types = query_params.get('event_types') and len(query_params.get('event_types', [])) > 0
+    has_severity = query_params.get('severity') and query_params.get('severity').strip()
+    
+    # Check query type - if it's explicitly about location, event_type, severity, it's Patrol-X related
+    query_type = query_params.get('query_type', 'general')
+    if query_type in ['location', 'event_type', 'severity', 'combined']:
+        return True
+    
+    # Check if question contains Patrol-X related keywords
+    question_lower = original_question.lower()
+    patrolx_keywords = [
+        # Locations (Haitian zones)
+        'delmas', 'pétion-ville', 'petionville', 'tabarre', 'cité soleil', 'site solèy',
+        'carrefour', 'martissant', 'croix-des-bouquets', 'pèlerin', 'thomassin',
+        'canapé-vert', 'laboule', 'kenscoff', 'bel-air', 'la saline', 'fontamara',
+        # Event types
+        'barikad', 'barricade', 'tire', 'shooting', 'kidnapping', 'enlèvement',
+        'manifestation', 'protest', 'accident', 'aksidan', 'roadblock', 'blokaj',
+        # Security/events related
+        'kisa k ap pase', 'what happened', 'quoi de neuf', 'événement', 'event',
+        'sécurité', 'security', 'danger', 'dangerous', 'insecurity', 'ensekirite',
+        'situation', 'alert', 'alerte', 'crisis', 'crise'
+    ]
+    
+    # If question contains any Patrol-X keywords, it's related
+    if any(keyword in question_lower for keyword in patrolx_keywords):
+        return True
+    
+    # If user explicitly asks about location, events, or security, it's related
+    if has_location or has_event_types or has_severity:
+        return True
+    
+    # If query type is general but contains location/event hints, check more carefully
+    if query_type == 'general':
+        # Very general questions like "what's the weather" or "tell me a joke" are not Patrol-X related
+        general_questions = [
+            'weather', 'météo', 'tan', 'joke', 'blague', 'joke', 'funny',
+            'recipe', 'recette', 'cooking', 'cuisine', 'how to', 'comment faire',
+            'what is', 'qu\'est-ce que', 'kisa se', 'definition', 'définition'
+        ]
+        if any(gq in question_lower for gq in general_questions):
+            # Check if it's also about Haiti/Patrol-X context
+            if not any(pk in question_lower for pk in ['haiti', 'haitian', 'ayiti', 'haitien']):
+                return False
+    
+    # Default: if we extracted any Patrol-X parameters, assume it's related
+    # Otherwise, it's likely a general question
+    return has_location or has_event_types or has_severity
+
+
+def answer_general_question(original_question, language='ht'):
+    """
+    Answer general questions using Grok's knowledge (not Patrol-X related).
+    
+    Args:
+        original_question (str): User's question
+        language (str): Detected language (ht, fr, en)
+    
+    Returns:
+        str: Grok's answer to the general question
+    """
+    try:
+        # Use Grok directly for general knowledge questions
+        system_prompt = f"""You are a helpful AI assistant. Answer the user's question clearly and accurately using your knowledge.
+        
+Respond in {language} language if the question is in that language, otherwise respond in the same language as the question."""
+        
+        completion = client.chat.completions.create(
+            model=model_list[0],  # grok-4-1-fast-reasoning for general knowledge
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": original_question}
+            ]
+        )
+        
+        answer = completion.choices[0].message.content
+        print(f"Answered general question using Grok knowledge")
+        return answer
+        
+    except Exception as e:
+        print(f"Error answering general question: {e}")
+        lang = language
+        if lang == 'ht':
+            return "Désolé, mwen pa ka reponn kèksyon ou a kounye a. Tanpri eseye ankò."
+        elif lang == 'fr':
+            return "Désolé, je n'ai pas pu traiter votre question. Veuillez réessayer."
+        else:
+            return "Sorry, I couldn't process your question. Please try again."
+
+
 def analyse_chat_prompt(preprocessed_message):
     """
-    Analyze user query and generate response using Grok-2.
+    Analyze user query and generate response using Grok.
+    Routes to Patrol-X event search or general knowledge based on question type.
     
     Args:
         preprocessed_message (dict): Query parameters from preprocessing
@@ -389,11 +487,37 @@ def analyse_chat_prompt(preprocessed_message):
         str: Generated response in the detected language
     """
     try:
+        original_question = preprocessed_message.get('original_question', '')
+        language = preprocessed_message.get('language', 'ht')
+        
+        # Check if question is Patrol-X related
+        is_related = is_patrolx_related(preprocessed_message, original_question)
+        
+        if not is_related:
+            # Not Patrol-X related: use Grok's general knowledge
+            print("Question is not Patrol-X related - using Grok general knowledge")
+            return answer_general_question(original_question, language)
+        
+        # Patrol-X related: use event-based search
+        print("Question is Patrol-X related - using event search")
         system_prompt = load_prompt(GPT_CHAT_SYSTEM_PROMPT)
         
         # Determine if we should use vector search (no location specified)
         location = preprocessed_message.get('location')
-        original_question = preprocessed_message.get('original_question', '')
+        query_type = preprocessed_message.get('query_type', 'general')
+        
+        # For general situation questions, ensure we use last_24h events
+        if query_type == 'general':
+            # Check if it's a general situation question (safety, can I go out, etc.)
+            situation_keywords = ['koman laria', 'eske m ka soti', 'how is the area', 'can i go out', 
+                                 'is it safe', 'kijan sitiyasyon', 'eske li an sekirite', 'should i go out']
+            question_lower = original_question.lower()
+            is_situation_question = any(keyword in question_lower for keyword in situation_keywords)
+            
+            if is_situation_question:
+                # Force last_24h for situation questions
+                preprocessed_message['time_range'] = 'last_24h'
+                print("General situation question detected - using last_24h events")
         
         if not location or not location.strip():
             # No location: use Grok vector search to find semantically relevant events

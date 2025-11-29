@@ -56,7 +56,8 @@ def analyse_chat_prompt(preprocessed_message):
 
         if preprocessed_message['location'] == "":
             return "Please provide a location to get the events."
-
+        if preprocessed_message['location'] == "general":
+            return "Please provide a specific location to get the events."
         user_prompt = f"""
             User question context (DeepSeek):
             {preprocessed_message}

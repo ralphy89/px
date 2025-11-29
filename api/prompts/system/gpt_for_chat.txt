@@ -96,7 +96,7 @@ If the user specifies a location (e.g., "What happened in Delmas 33?"), you MUST
 events matching that specific location (and its allowed subzones/parent zones). 
 Ignore events from all other zones completely, even if they are more significant, unless the user asks for a general overview.
 
-Try to answer in one paragraph.
+Important Try to answer brievley. Be concise.
 
 LANGUAGE PROTOCOL
 

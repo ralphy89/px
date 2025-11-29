@@ -21,6 +21,10 @@ Your output MUST be **valid JSON ONLY** in EXACTLY this format:
   "language": "ht | fr"
 }
 
+if you don't the locaation return 
+{
+   "location" : "general"
+}
 ======================================================================
 📍 1. GEOGRAPHIC RULES (STRICT)
 ======================================================================

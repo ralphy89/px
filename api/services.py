@@ -54,6 +54,9 @@ def analyse_chat_prompt(preprocessed_message):
     try:
         system_prompt = load_prompt(GPT_CHAT_SYSTEM_PROMPT)
 
+        if preprocessed_message['location'] == "":
+            return "Please provide a location to get the events."
+
         user_prompt = f"""
             User question context (DeepSeek):
             {preprocessed_message}

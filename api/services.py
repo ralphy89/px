@@ -12,6 +12,7 @@ if not HF_TOKEN:
     raise RuntimeError("Missing HF_TOKEN environment variable")
 
 
+
 client = OpenAI(
     base_url="https://router.huggingface.co/v1",
     api_key=HF_TOKEN,
@@ -22,10 +23,11 @@ def load_prompt(path):
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
-DEEP_SYSTEM_PROMPT = "./prompts/system/deepseek_pretriage.txt"
-GPT_SYSTEM_PROMPT = "./prompts/system/gpt_analysis.txt"
-DEEPSEEK_CHAT_SYSTEM_PROMPT = "./prompts/system/deepseek_for_chat.txt"
-GPT_CHAT_SYSTEM_PROMPT = "prompts/system/gpt_for_chat.txt"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEEP_SYSTEM_PROMPT = os.path.join(BASE_DIR, "prompts/system/deepseek_pretriage.txt")
+GPT_SYSTEM_PROMPT = os.path.join(BASE_DIR, "prompts/system/gpt_analysis.txt")
+DEEPSEEK_CHAT_SYSTEM_PROMPT = os.path.join(BASE_DIR, "prompts/system/deepseek_for_chat.txt")
+GPT_CHAT_SYSTEM_PROMPT = os.path.join(BASE_DIR, "prompts/system/gpt_for_chat.txt")
 # USER_PROMPT   = load_prompt("prompts/user/chatbot_query.md")
 
 

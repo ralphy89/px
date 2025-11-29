@@ -157,7 +157,7 @@ def get_summary_prompt(events_list, location):
     3. Identify risks strictly based on the data.
     4. Provide a short and structured “état des lieux”.
     5. Mention sources exactly as provided.
-    6. Keep the summary concise (2–3 short paragraphs).
+    6. Keep the summary concise (1 short paragraphs).
 
     Use familiar Haitian alert language such as:
     - "État des lieux :"

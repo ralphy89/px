@@ -10,7 +10,6 @@ from datetime import datetime, UTC, timedelta
 
 
 
-
 GROK_TOKEN = os.environ.get("GROK_TOKEN")
 if not GROK_TOKEN:
     raise RuntimeError(

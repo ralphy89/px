@@ -1,0 +1,36 @@
+[
+  {
+    "user_id": "507f1f77bcf86cd799439011",
+    "event_id": "507f191e810c19729de860ea",
+    "title": "Shooting in Delmas 33",
+    "message": "Des tirs ont été signalés dans la zone de Delmas 33. Il est recommandé d'éviter cette zone et de prendre des routes alternatives si possible.",
+    "location": "Delmas 33",
+    "event_type": "shooting",
+    "severity": "critical",
+    "is_read": false,
+    "created_at": "2025-01-15T14:30:00.000Z"
+  },
+  {
+    "user_id": "507f1f77bcf86cd799439011",
+    "event_id": "507f191e810c19729de860eb",
+    "title": "Roadblock in Pétion-Ville",
+    "message": "Barricades signalées sur la route principale de Pétion-Ville. La circulation est bloquée. Utilisez des itinéraires alternatifs.",
+    "location": "Pétion-Ville",
+    "event_type": "roadblock",
+    "severity": "high",
+    "is_read": false,
+    "created_at": "2025-01-15T15:45:00.000Z"
+  },
+  {
+    "user_id": "507f1f77bcf86cd799439012",
+    "event_id": "507f191e810c19729de860ec",
+    "title": "Kidnapping in Martissant",
+    "message": "Un cas de kidnapping a été signalé dans la zone de Martissant. Évitez cette zone et restez vigilant.",
+    "location": "Martissant",
+    "event_type": "kidnapping",
+    "severity": "critical",
+    "is_read": true,
+    "created_at": "2025-01-15T10:20:00.000Z"
+  }
+]
+

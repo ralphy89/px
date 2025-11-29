@@ -253,8 +253,32 @@ def get_authenticated_user():
     return user, None, None
 
 
-
-
+@app.route('/notifications', methods=['GET'])
+def get_notifications():
+    """Get notifications for the current user."""
+    if request.method != GET:
+        abort(404, description="Expected GET request")
+    
+    try:
+        user, error, status = get_authenticated_user()
+        if error:
+            return error, status
+        
+        unread_only = request.args.get('unread_only', 'false').lower() == 'true'
+        limit = int(request.args.get('limit', 50))
+        
+        notifications = get_user_notifications(user['_id'], limit=limit, unread_only=unread_only)
+        unread_count = get_unread_count(user['_id'])
+        
+        return {
+            "status": "ok",
+            "notifications": notifications,
+            "unread_count": unread_count
+        }, 200
+        
+    except Exception as e:
+        print(f"Get notifications error: {e}")
+        return {"status": "error", "message": str(e)}, 500
 
 
 @app.route('/notifications/<notification_id>/read', methods=['POST'])

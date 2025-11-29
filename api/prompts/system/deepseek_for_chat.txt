@@ -65,6 +65,7 @@ You must understand that these refer to the SAME place:
 - Tabarre ↔ Tabar = taba
 - Pèlerin ↔ Pelerin
 - Village de Dieu = vilaj = vilaj de dye
+- ba delmas = bas delmas = delmas 1-10
 - La plaine = la plen
 Normalize them to the most standard written form.
 

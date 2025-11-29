@@ -118,6 +118,30 @@ def get_summary_prompt(events_list, location):
         these other zones as Carrefour.  
         - Report them separately and clearly as distinct areas.
 
+        IMPORTANT GEOGRAPHIC RULES (HAITI):
+
+        1. "Carrefour" is a standalone commune. 
+        It does NOT contain: 
+        - Carrefour Feuilles
+        - Carrefour Drouillard
+        - Carrefour Vincent
+
+        2. Any location that STARTS WITH "Carrefour " is NOT a subzone of the commune “Carrefour”.
+        Example:
+        - "Carrefour Feuilles" ≠ "Carrefour"
+        - "Carrefour Drouillard" ≠ "Carrefour"
+        - "Carrefour Vincent" ≠ "Carrefour"
+        Treat them as completely independent locations.
+        - If user ask about "Carrefour", you should not include "Carrefour Feuilles", 
+        "Carrefour Drouillard", "Carrefour Vincent" in the result. Keep it simple and clear.
+
+        3. Only Delmas is hierarchical:
+        - Delmas 19, Delmas 40B, Delmas 75 → subzones of Delmas.
+        But "Carrefour X" does NOT follow this rule.
+
+        You MUST respect these rules. Never merge, relate, or assume hierarchy between them.
+
+
     3. NEVER invent locations, subdivisions, or relations between zones.  
     Use ONLY what is explicitly found in the event list.
 
@@ -234,5 +258,4 @@ def analyse_msg(preprocessed_msg: dict):
     except Exception as e:
         print("Analysis error:", e)
         raise e
-
 

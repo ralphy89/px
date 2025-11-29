@@ -48,7 +48,6 @@ def get_events_by_location(location):
 
     # 2. Generate RAG summary
     summary = generate_summary(events_list, location)
-    print(f"Summary generated:\n{summary}")
     return {"status": "ok", "summary": summary}, 200
 
 
@@ -88,33 +87,3 @@ def receive_messages():
         abort(500, description=str(e))
 
         
-
-
-
-
-# @app.route('/chat', methods=[POST])
-# def execute():
-    # if request.method == POST:
-    #     if not request.is_json:
-    #             abort(400, description="Expected JSON body")
-    #     try:
-    #         messages = list(request.json['prompt'])
-    #         prompt = f"{PROMPT}\n{messages}"
-    #         print("Thinking.........")
-    #         completion = client.chat.completions.create(
-    #             model=model_list[1],
-    #             response_format={"type": "json_object"},
-    #             messages=[{"role": "user", "content": prompt}]
-    #         )
-
-    #         answer = completion.choices[0].message.content
-    #         print("Answer sent to the client")
-    #         return answer
-    #     except Exception as e:
-    #         print(e)
-    #         abort(400)
-           
-    # else:
-    #     abort(404)
-
-# print(execute(messages))

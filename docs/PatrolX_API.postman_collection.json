@@ -1,0 +1,161 @@
+{
+  "info": {
+    "name": "Patrol-X API",
+    "description": "API collection for Patrol-X - Transforming chaotic messages into structured alerts for Haiti",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": [""]
+        }
+      }
+    },
+    {
+      "name": "Process Messages",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"messages\": [\n    {\n      \"text\": \"Barikad nan Delmas 33, wout bloke!\",\n      \"source\": \"whatsapp\",\n      \"timestamp\": \"2025-01-15T10:30:00Z\",\n      \"metadata\": {}\n    },\n    {\n      \"text\": \"Yo tire nan Martissant, pran prekosyon!\",\n      \"source\": \"telegram\",\n      \"timestamp\": \"2025-01-15T10:35:00Z\",\n      \"metadata\": {}\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/messages",
+          "host": ["{{base_url}}"],
+          "path": ["messages"]
+        }
+      }
+    },
+    {
+      "name": "Get Latest Events",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/events/latest",
+          "host": ["{{base_url}}"],
+          "path": ["events", "latest"]
+        }
+      }
+    },
+    {
+      "name": "Get Location Summary - Delmas",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/events/location/Delmas",
+          "host": ["{{base_url}}"],
+          "path": ["events", "location", "Delmas"]
+        }
+      }
+    },
+    {
+      "name": "Get Location Summary - Martissant",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/events/location/Martissant",
+          "host": ["{{base_url}}"],
+          "path": ["events", "location", "Martissant"]
+        }
+      }
+    },
+    {
+      "name": "Get Location Summary - Pétion-Ville",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/events/location/Pétion-Ville",
+          "host": ["{{base_url}}"],
+          "path": ["events", "location", "Pétion-Ville"]
+        }
+      }
+    },
+    {
+      "name": "Chat - Haitian Creole",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Kisa k ap pase nan Delmas jodi a?\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/chat",
+          "host": ["{{base_url}}"],
+          "path": ["chat"]
+        }
+      }
+    },
+    {
+      "name": "Chat - French",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Qu'est-ce qui se passe à Delmas aujourd'hui?\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/chat",
+          "host": ["{{base_url}}"],
+          "path": ["chat"]
+        }
+      }
+    },
+    {
+      "name": "Chat - English",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"What's happening in Delmas today?\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/chat",
+          "host": ["{{base_url}}"],
+          "path": ["chat"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ]
+}
+

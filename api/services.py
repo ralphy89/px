@@ -1,5 +1,6 @@
 import json
 import os
+import numpy as np
 from flask import abort
 from openai import OpenAI
 from pydantic.types import T
@@ -7,17 +8,31 @@ from .utils import strip_markdown_fences
 from .db.models import *
 from datetime import datetime, UTC, timedelta                   
 
-HF_TOKEN = os.environ.get("HF_TOKEN")
-if not HF_TOKEN:
-    raise RuntimeError("Missing HF_TOKEN environment variable")
 
+# Grok AI (xAI) API configuration
+# Get your API key from https://console.x.ai/
+# Set it as environment variable: export GROK_API_KEY="your-api-key-here"
+# Or set it as: export XAI_API_KEY="your-api-key-here"
 
+GROK_TOKEN = os.environ.get("GROK_TOKEN")
+if not GROK_TOKEN:
+    raise RuntimeError(
+        "Missing GROK_API_KEY or XAI_API_KEY environment variable.\n"
+        "Get your API key from https://console.x.ai/\n"
+        "Then set it: export GROK_API_KEY='your-api-key-here'"
+    )
 
+# Grok AI uses OpenAI-compatible API
 client = OpenAI(
-    base_url="https://router.huggingface.co/v1",
-    api_key=HF_TOKEN,
+    base_url="https://api.x.ai/v1",
+    api_key=GROK_TOKEN,
 )
-model_list = ['openai/gpt-oss-120b','deepseek-ai/DeepSeek-V3']
+
+# Grok model names - using Grok for all operations
+# Available models: grok-beta, grok-2, grok-2-1212, grok-2-vision-1212
+# Using grok-2 for all operations (most capable model)
+# Alternative: Use grok-beta for faster preprocessing if needed
+model_list = ['grok-4-1-fast-reasoning', 'grok-4-fast-reasoning']  # [analysis_model, preprocessing_model] - both use grok-2
 
 def load_prompt(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -56,7 +71,7 @@ def preprocess_chat_prompt(message):
         
         completion = client.chat.completions.create(
             response_format={"type": "json_object"},
-            model=model_list[1],  # DeepSeek-V3
+            model=model_list[1], 
             messages=[
                 {"role": "system", "content": system_prompt}, 
                 {"role": "user", "content": user_prompt}
@@ -127,9 +142,245 @@ def format_events_for_rag(events):
     return "\n".join(formatted_events)
 
 
+def create_event_searchable_text(event):
+    """
+    Create a searchable text representation of an event for embedding.
+    
+    Args:
+        event (dict): Event dictionary
+    
+    Returns:
+        str: Searchable text combining summary, location, event_type, etc.
+    """
+    parts = []
+    
+    # Add summary (most important)
+    if event.get('summary'):
+        parts.append(event['summary'])
+    
+    # Add event type
+    if event.get('event_type'):
+        parts.append(f"Event type: {event['event_type']}")
+    
+    # Add location
+    if event.get('location'):
+        parts.append(f"Location: {event['location']}")
+    
+    # Add severity if high/critical
+    if event.get('severity') in ['critical', 'high']:
+        parts.append(f"Severity: {event['severity']}")
+    
+    # Add recommended action if available
+    if event.get('recommended_action'):
+        parts.append(event['recommended_action'])
+    
+    return " ".join(parts)
+
+
+def get_query_embedding_grok(query_text):
+    """
+    Generate embedding for user query using Grok AI embeddings API.
+    
+    Args:
+        query_text (str): User query text
+    
+    Returns:
+        numpy.ndarray: Query embedding vector or None
+    """
+    try:
+        # Try different Grok embedding models
+        # Note: Grok may use different model names for embeddings
+        embedding_models = ["grok-2-1212", "grok-2", "grok-beta"]
+        
+        for model_name in embedding_models:
+            try:
+                response = client.embeddings.create(
+                    model=model_name,
+                    input=query_text
+                )
+                
+                embedding = np.array(response.data[0].embedding)
+                print(f"Successfully generated embedding using {model_name}")
+                return embedding
+            except Exception as model_error:
+                print(f"Model {model_name} failed: {model_error}, trying next...")
+                continue
+        
+        print("All Grok embedding models failed")
+        return None
+    except Exception as e:
+        print(f"Error generating query embedding with Grok: {e}")
+        return None
+
+
+def get_event_embeddings_grok(events):
+    """
+    Generate embeddings for a list of events using Grok AI.
+    
+    Args:
+        events (list): List of event dictionaries
+    
+    Returns:
+        dict: Dictionary mapping event index to embedding
+    """
+    if not events:
+        return {}
+    
+    try:
+        # Create searchable texts
+        searchable_texts = [create_event_searchable_text(e) for e in events]
+        
+        # Try different Grok embedding models
+        embedding_models = ["grok-2-1212", "grok-2", "grok-beta"]
+        
+        for model_name in embedding_models:
+            try:
+                # Batch embed using Grok API
+                response = client.embeddings.create(
+                    model=model_name,
+                    input=searchable_texts
+                )
+                
+                event_embeddings = {}
+                for i, embedding_data in enumerate(response.data):
+                    if i < len(events):
+                        event_embeddings[i] = np.array(embedding_data.embedding)
+                
+                print(f"Successfully generated {len(event_embeddings)} embeddings using {model_name}")
+                return event_embeddings
+            except Exception as model_error:
+                print(f"Model {model_name} failed: {model_error}, trying next...")
+                continue
+        
+        print("All Grok embedding models failed")
+        return {}
+        
+    except Exception as e:
+        print(f"Error generating event embeddings with Grok: {e}")
+        return {}
+
+
+def cosine_similarity(vec1, vec2):
+    """Calculate cosine similarity between two vectors."""
+    try:
+        dot_product = np.dot(vec1, vec2)
+        norm1 = np.linalg.norm(vec1)
+        norm2 = np.linalg.norm(vec2)
+        
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        
+        return dot_product / (norm1 * norm2)
+    except Exception as e:
+        print(f"Error calculating cosine similarity: {e}")
+        return 0.0
+
+
+def vector_search_events_grok(query_text, events, top_k=10):
+    """
+    Perform vector search using Grok embeddings to find most relevant events.
+    
+    Args:
+        query_text (str): User query
+        events (list): List of candidate events
+        top_k (int): Number of top results to return
+    
+    Returns:
+        list: Top K most relevant events sorted by relevance
+    """
+    if not events or len(events) == 0:
+        return []
+    
+    try:
+        # Generate query embedding
+        query_embedding = get_query_embedding_grok(query_text)
+        if query_embedding is None:
+            print("Query embedding failed, returning recent events")
+            return events[:top_k] if len(events) > top_k else events
+        
+        # Generate event embeddings
+        event_embeddings = get_event_embeddings_grok(events)
+        if not event_embeddings:
+            print("Event embedding failed, returning recent events")
+            return events[:top_k] if len(events) > top_k else events
+        
+        # Calculate similarities
+        similarities = []
+        for i, event in enumerate(events):
+            if i in event_embeddings:
+                similarity = cosine_similarity(query_embedding, event_embeddings[i])
+                similarities.append((similarity, event))
+            else:
+                # If embedding failed for this event, give it low priority
+                similarities.append((0.0, event))
+        
+        # Sort by similarity (descending) and return top K
+        similarities.sort(key=lambda x: x[0], reverse=True)
+        top_events = [event for _, event in similarities[:top_k]]
+        
+        print(f"Grok vector search: Found {len(top_events)} most relevant events")
+        return top_events
+        
+    except Exception as e:
+        print(f"Vector search error: {e}, returning recent events")
+        return events[:top_k] if len(events) > top_k else events
+
+
+def get_events_with_vector_search(query_params, original_question):
+    """
+    Get events using Grok vector search when no location is specified.
+    This prevents loading all events and instead finds semantically relevant ones.
+    
+    Args:
+        query_params (dict): Query parameters
+        original_question (str): Original user question for semantic search
+    
+    Returns:
+        list: Most relevant events
+    """
+    # First, get candidate events with filters (but no location)
+    candidate_params = query_params.copy()
+    candidate_params['location'] = None
+    
+    # Apply time filter - default to last 24h for general queries to limit candidates
+    # This prevents loading too many old events
+    if candidate_params.get('time_range') == 'any':
+        candidate_params['time_range'] = 'last_24h'
+        print("No time range specified for general query - defaulting to last_24h")
+    
+    # Get candidate events (limited by time and other filters)
+    candidate_events = get_events_for_chat(candidate_params)
+    
+    if not candidate_events:
+        print("No candidate events found for vector search")
+        return []
+    
+    print(f"Found {len(candidate_events)} candidate events for Grok vector search")
+    
+    # Build enhanced search query from original question and extracted filters
+    # This helps the vector search understand the user's intent better
+    search_query = original_question
+    
+    # Enhance search query with extracted filters for better semantic matching
+    if query_params.get('event_types'):
+        search_query += " " + " ".join(query_params['event_types'])
+    if query_params.get('severity'):
+        search_query += " " + query_params['severity'] + " severity urgent"
+    
+    # Perform vector search using Grok embeddings to get top relevant events
+    # Limit to top 15 most relevant to keep response focused
+    try:
+        top_events = vector_search_events_grok(search_query, candidate_events, top_k=15)
+        return top_events
+    except Exception as e:
+        print(f"Grok vector search failed: {e}, falling back to recent events")
+        # Fallback: return most recent events if vector search fails
+        return candidate_events[:15] if len(candidate_events) > 15 else candidate_events
+
+
 def analyse_chat_prompt(preprocessed_message):
     """
-    Analyze user query and generate response using GPT-OSS-120B.
+    Analyze user query and generate response using Grok-2.
     
     Args:
         preprocessed_message (dict): Query parameters from preprocessing
@@ -140,8 +391,19 @@ def analyse_chat_prompt(preprocessed_message):
     try:
         system_prompt = load_prompt(GPT_CHAT_SYSTEM_PROMPT)
         
-        # Query events based on extracted parameters
-        events = get_events_for_chat(preprocessed_message)
+        # Determine if we should use vector search (no location specified)
+        location = preprocessed_message.get('location')
+        original_question = preprocessed_message.get('original_question', '')
+        
+        if not location or not location.strip():
+            # No location: use Grok vector search to find semantically relevant events
+            print("No location specified - using Grok vector search")
+            events = get_events_with_vector_search(preprocessed_message, original_question)
+        else:
+            # Location specified: use traditional filtered query
+            print("Location specified - using filtered query")
+            events = get_events_for_chat(preprocessed_message)
+        
         events_context = format_events_for_rag(events)
         
         # Build user prompt with context
@@ -161,7 +423,7 @@ Respond in {preprocessed_message.get('language', 'ht')} language.
         print(f"Events found: {len(events)}")
         
         completion = client.chat.completions.create(
-            model=model_list[0],  # GPT-OSS-120B
+            model=model_list[0],  # grok-2 for chat analysis
             messages=[
                 {"role": "system", "content": system_prompt}, 
                 {"role": "user", "content": user_prompt}
@@ -185,7 +447,7 @@ Respond in {preprocessed_message.get('language', 'ht')} language.
 
 def chat_with_gpt(message):
     """
-    Main chat function that processes user messages.
+    Main chat function that processes user messages using Grok AI.
     
     Args:
         message (str): User's question/prompt
@@ -193,7 +455,7 @@ def chat_with_gpt(message):
     Returns:
         dict: Response with status and answer
     """
-    print(f"Chat with GPT: {message}")
+    print(f"Chat with Grok: {message}")
     
     # Step 1: Preprocess to extract query parameters
     preprocessed_msg = preprocess_chat_prompt(message)
@@ -308,7 +570,7 @@ def generate_summary(events_list, location):
         return f"No events detected in the last 24 hours for {location}. The area appears calm."
     prompt = get_summary_prompt(events_list, location)
     result = client.chat.completions.create(
-        model=model_list[1],
+        model=model_list[1],  # grok-2 for summarization
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -318,7 +580,7 @@ def generate_summary(events_list, location):
 def preprocess_msg(messages: list):
     
     """
-    Preprocess incoming messages using DeepSeek-V3.
+    Preprocess incoming messages using Grok AI.
     - Filters irrelevant messages
     - Normalizes text
     - Extracts early tags
@@ -338,7 +600,7 @@ def preprocess_msg(messages: list):
         print("Preprocessing...")
 
         completion = client.chat.completions.create(
-            model=model_list[1],          # DeepSeek-V3 index
+            model=model_list[1],          # grok-2 for preprocessing
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -358,11 +620,11 @@ def preprocess_msg(messages: list):
 
 def analyse_msg(preprocessed_msg: dict):
     """
-    Final deep analysis using GPT-OSS-120B.
+    Final deep analysis using Grok-2.
     Takes preprocessed messages (dict/json) and returns a structured event.
     """
     try:
-        # Load system prompt (Haiti-optimized GPT analysis)
+        # Load system prompt (Haiti-optimized analysis)
         system_prompt = load_prompt(GPT_SYSTEM_PROMPT)
 
         # Build user prompt - ALWAYS JSON-encode the data
@@ -375,7 +637,7 @@ def analyse_msg(preprocessed_msg: dict):
         print("Analysing...")
 
         completion = client.chat.completions.create(
-            model=model_list[0],  # GPT-OSS-120B MUST be here, not DeepSeek
+            model=model_list[0],  # grok-2 for deep analysis
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": system_prompt },

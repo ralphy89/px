@@ -181,7 +181,7 @@ def generate_summary(events_list, location):
 
 
 def preprocess_msg(messages: list):
-    os.system("cls")
+    
     """
     Preprocess incoming messages using DeepSeek-V3.
     - Filters irrelevant messages

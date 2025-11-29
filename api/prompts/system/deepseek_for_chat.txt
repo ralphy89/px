@@ -22,7 +22,7 @@ Examples:
 - Delmas → Delmas 19, Delmas 33, Delmas 40B, Delmas 75, etc.
 - Tabarre → Tabarre 27, Tabarre 52, Clercine (Clèrsin)
 - Pétion-Ville (Pétionville) → Petyonvil
-- Croix-des-Bouquets → Kwadebouke, Bon Repos
+- Croix-des-Bouquets → Kwadebouke
 - Pelerin (Pèlerin) → Pelerin 1–9
 - Thomassin → Thomassin 25, Thomassin 32
 - Canapé-Vert → Kanapevè

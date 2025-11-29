@@ -20,6 +20,20 @@ recipe = db['recipe']
 
 event_collection = db['events']
 
+
+def get_events_for_chat(preprocessed_message):
+    return list(
+        event_collection.find(
+            {
+                "location": {
+                    "$regex": preprocessed_message['location'],
+                    "$options": "i"   # case-insensitive
+                },
+            },
+            {"_id": 0}
+        )
+    )
+
 def save_event(analysed_events):
     try:
         result = event_collection.insert_many(analysed_events['events'])
@@ -29,6 +43,22 @@ def save_event(analysed_events):
    
 
 from datetime import UTC, datetime, timedelta
+
+def query_events_by_location(location):
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
+
+    return list(
+        event_collection.find(
+            {
+                "location": {
+                    "$regex": location,
+                    "$options": "i"   # case-insensitive
+                },
+                # "timestamp_start": {"$gte": cutoff}
+            },
+            {"_id": 0}
+        ).sort("timestamp_start", -1)
+    )
 
 def query_events(mode="limit", limit=10):
     if mode == "latest":
@@ -55,6 +85,7 @@ def query_events(mode="limit", limit=10):
             },
             {"_id":0}).sort("timestamp_start", -1)
         )
+
 
     return []
 

@@ -2,64 +2,9 @@ import json
 import os
 from flask import abort
 from openai import OpenAI
+from pydantic.types import T
 from .utils import strip_markdown_fences
-PREPROCESS_PROMPT = f"""
-
-You are ChatGPT-5.1, an advanced AI specialized in deep message analysis with full adaptation to the Haitian context.
-You understand local cultural norms, linguistic patterns (Kreyòl, French, English, mixed), 
-and real-world constraints in Haiti such as electricity instability, connectivity issues, transportation risks, 
-MonCash usage, local business etiquette, and the indirect communication style common among Haitians.
-
-For each message provided, perform a complete analysis and return a JSON object with two keys:
-1. "messages_analysis": an array containing detailed analysis per message
-2. "etat_des_lieux": a high-level synthesis summarizing the global situation, trends, risks, and priorities
-
-Each item in "messages_analysis" MUST include:
-
-1. "message": the original text
-2. "language": detected language ["kreyol","french","english","mixed"]
-3. "category": inferred domain
-     ["personal","business","payment","technology","support",
-      "logistics","security","urgent_request","social","other"]
-4. "relevance": ["Not Relevant","Relevant","Urgent"]
-5. "priority_rank": integer from 1 (highest priority) to 5 (lowest priority)
-      Priority is based on:
-        - urgency
-        - potential risk (security, deadlines, transport issues)
-        - cultural/business importance
-        - emotional or relational weight
-6. "confidence": float between 0 and 1
-7. "summary": a concise interpretation adapted to Haitian context
-8. "recommendation": the best next action considering local realities
-      Examples:
-        - unstable electricity/internet
-        - MonCash or local payment constraints
-        - local working hours
-        - transport/security concerns
-        - business etiquette in Haiti
-        - WhatsApp-style informal communication
-
-After analyzing all messages, produce a global section:
-
-"etat_des_lieux": 
-    A structured synthesis that includes:
-    - overall tone (positive, neutral, tense, urgent)
-    - general themes (business, personal, logistics, etc.)
-    - risks or constraints specific to Haiti (security, transport, power, delays)
-    - the global priority actions
-    - the general state of the situation ("où en sommes-nous?")
-    - clarity on what should be done next
-
-Your reasoning must be:
-- precise
-- context-aware
-- culturally coherent with Haiti
-- aligned with ChatGPT-5.1 reasoning quality
-- concise but actionable
-
-Messages to analyze:
-
-"""
+from .db.models import *
                          
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
@@ -79,9 +24,134 @@ def load_prompt(path):
 
 DEEP_SYSTEM_PROMPT = "prompts/system/deepseek_pretriage.txt"
 GPT_SYSTEM_PROMPT = "prompts/system/gpt_analysis.txt"
-
+DEEPSEEK_CHAT_SYSTEM_PROMPT = "prompts/system/deepseek_for_chat.txt"
+GPT_CHAT_SYSTEM_PROMPT = "prompts/system/gpt_for_chat.txt"
 # USER_PROMPT   = load_prompt("prompts/user/chatbot_query.md")
 
+
+def preprocess_chat_prompt(message):
+    try:
+        system_prompt = load_prompt(DEEPSEEK_CHAT_SYSTEM_PROMPT)
+        user_prompt = f"User question: {message}"
+        print(f"Preprocessing User prompt: {user_prompt}")
+        completion = client.chat.completions.create(
+            response_format={"type": "json_object"},
+            model=model_list[1],
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+        )
+        preprocessed_msg = strip_markdown_fences(completion.choices[0].message.content)
+        print(f"Preprocessed message: {preprocessed_msg}")
+        return json.loads(preprocessed_msg)
+    except Exception as e:
+        print(f"Error preprocessing chat prompt: {e}")
+        return None
+ 
+
+
+def analyse_chat_prompt(preprocessed_message):
+    try:
+        system_prompt = load_prompt(GPT_CHAT_SYSTEM_PROMPT)
+
+        user_prompt = f"""
+            User question context (DeepSeek):
+            {preprocessed_message}
+
+            Database events:
+            {get_events_for_chat(preprocessed_message)}
+
+            Respond in the language used in the user question.
+            """
+        
+        completion = client.chat.completions.create(
+            model=model_list[0],
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+        )
+
+        analysed_msg = completion.choices[0].message.content
+        return analysed_msg
+       
+    except Exception as e:
+        print(f"Error analysing chat prompt: {e}")
+        return None
+
+def chat_with_gpt(message):
+    print(f"Chat with GPT: {message}")
+    preprocessed_msg = preprocess_chat_prompt(message)
+    analysed_msg = analyse_chat_prompt(preprocessed_msg)
+    # return {"status": "ok", "answer":analysed_msg}
+    return {"status": "ok", "answer": analysed_msg}
+
+def get_summary_prompt(events_list, location):
+    # Build RAG context from events
+    context = "\n".join([
+    f"- [{e.get('timestamp_start')}] {e.get('summary')} "
+    f"(Type: {e.get('event_type')}, Severity: {e.get('severity')}, "
+    f"Location: {e.get('location')}, Sources: {e.get('sources')})"
+    for e in events_list
+    ])
+
+    print(context)
+    prompt = f"""
+    You are Patrol-X, an AI system summarizing verified public safety and mobility alerts 
+    for Haitian cities.
+
+    INTERPRETATION RULES BASED ON HAITIAN GEOGRAPHY (critical):
+
+    1. The user selected: "{location}". This is the main area of interest.
+
+    2. Haitian locations follow different naming conventions. 
+    Apply these rules to interpret event locations correctly:
+
+    • **Delmas, Pelerin, Martissant and Tabarre rule**  
+        - Locations like "Delmas 19", "Delmas 33", "Delmas 75", "Pelerin 19", "Pelerin 33", "Pelerin 75", "Martissant 19", "Martissant 33", "Martissant 75", "Tabarre 19", "Tabarre 33", "Tabarre 75", etc. 
+        ARE official subdivisions of Delmas, Pelerin, Martissant and Tabarre.  
+        - When the selected location is "Delmas", "Pelerin", "Martissant" or "Tabarre", include and summarize 
+        all events from "Delmas X", "Pelerin X", "Martissant X" or "Tabarre X" zones together.
+
+    • **Non-numbered commune rule (e.g., Carrefour, Pétion-Ville)**  
+        - Locations such as "Carrefour Drouillard", "Carrefour Feuilles", 
+        "Carrefour Vincent", etc. are NOT subdivisions of Carrefour.  
+        - They are separate zones that merely share a name root.  
+        - When the selected location is "Carrefour", DO NOT merge or treat 
+        these other zones as Carrefour.  
+        - Report them separately and clearly as distinct areas.
+
+    3. NEVER invent locations, subdivisions, or relations between zones.  
+    Use ONLY what is explicitly found in the event list.
+
+    EVENTS DETECTED (last 24h):
+    {context}
+
+    YOUR TASKS:
+    1. Summarize the situation clearly based ONLY on the provided events.
+    2. Respect the rules above when grouping or separating zones.
+    3. Identify risks strictly based on the data.
+    4. Provide a short and structured “état des lieux”.
+    5. Mention sources exactly as provided.
+    6. Keep the summary concise (2–3 short paragraphs).
+
+    Use familiar Haitian alert language such as:
+    - "État des lieux :"
+    - "Voici ce qu’il faut retenir :"
+    - "Selon les informations disponibles…"
+    - "Zones concernées :"
+    - "Sources mentionnées : …"
+
+    Produce ONLY the final summary.
+    """
+
+    return prompt
+
+def generate_summary(events_list, location):
+    if not events_list:
+        return f"No events detected in the last 24 hours for {location}. The area appears calm."
+    prompt = get_summary_prompt(events_list, location)
+    result = client.chat.completions.create(
+        model=model_list[1],
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    return result.choices[0].message.content
 
 
 def preprocess_msg(messages: list):

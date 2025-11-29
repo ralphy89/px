@@ -39,7 +39,7 @@ If user gives a subzone:
 Recognized hierarchical parents:
 
 - **Delmas** → Delmas 19, 31, 33, 40A, 40B, 75, 105…
-- **Tabarre** → Tabarre 27, Tabarre 52, Clercine (Klèsin)
+- **Tabarre** → taba , Tabarre 27, Tabarre 52, Clercine (Klèsin)
 - **Pétion-Ville** (Petionville, Petyonvil, PV)
 - **Croix-des-Bouquets** (Kwadebouke, Bon Repos)
 - **Pèlerin** → Pèlerin 1–9

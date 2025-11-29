@@ -3,6 +3,7 @@ from flask import Flask, abort, request
 from flask_cors import CORS
 from .services import *
 from .db.models import *
+from .auth import sign_up, sign_in, logout, get_current_user
 
 app = Flask(__name__)
 CORS(app, origins=["*"])
@@ -13,6 +14,141 @@ GET = 'GET'
 @app.route('/')
 def home():
     return "<h1>Welcome To Patrol-X</h1>"
+
+
+# ============================================================================
+# AUTHENTICATION ENDPOINTS
+# ============================================================================
+
+@app.route('/auth/signup', methods=['POST'])
+def signup():
+    """Sign up a new user."""
+    if request.method != POST:
+        abort(404, description="Expected POST request")
+    
+    if not request.is_json:
+        abort(400, description="Expected JSON body")
+    
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        
+        response, status_code = sign_up(username, email, password)
+        return response, status_code
+        
+    except Exception as e:
+        print(f"Signup error: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+
+@app.route('/auth/signin', methods=['POST'])
+def signin():
+    """Sign in an existing user."""
+    if request.method != POST:
+        abort(404, description="Expected POST request")
+    
+    if not request.is_json:
+        abort(400, description="Expected JSON body")
+    
+    try:
+        data = request.get_json()
+        username_or_email = data.get('username') or data.get('email')
+        password = data.get('password')
+        
+        response, status_code = sign_in(username_or_email, password)
+        return response, status_code
+        
+    except Exception as e:
+        print(f"Signin error: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+
+@app.route('/auth/logout', methods=['POST'])
+def logout_endpoint():
+    """Logout a user."""
+    if request.method != POST:
+        abort(404, description="Expected POST request")
+    
+    try:
+        # Get token from Authorization header or request body
+        token = None
+        
+        # Try Authorization header first
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+        
+        # Fallback to request body
+        if not token and request.is_json:
+            data = request.get_json()
+            token = data.get('token')
+        
+        if not token:
+            return {
+                "status": "error",
+                "message": "Token is required"
+            }, 400
+        
+        response, status_code = logout(token)
+        return response, status_code
+        
+    except Exception as e:
+        print(f"Logout error: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+
+@app.route('/auth/me', methods=['GET'])
+def get_me():
+    """Get current user information."""
+    if request.method != GET:
+        abort(404, description="Expected GET request")
+    
+    try:
+        # Get token from Authorization header
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return {
+                "status": "error",
+                "message": "Authorization token required"
+            }, 401
+        
+        token = auth_header.split(' ')[1]
+        user = get_current_user(token)
+        
+        if not user:
+            return {
+                "status": "error",
+                "message": "Invalid or expired token"
+            }, 401
+        
+        return {
+            "status": "ok",
+            "user": {
+                "id": user['_id'],
+                "username": user['username'],
+                "email": user['email'],
+                "created_at": user.get('created_at'),
+                "is_active": user.get('is_active', True)
+            }
+        }, 200
+        
+    except Exception as e:
+        print(f"Get me error: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
 
 
 @app.route('/chat', methods=['POST'])

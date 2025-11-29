@@ -5,7 +5,6 @@ from pymongo.server_api import ServerApi
 from datetime import UTC, datetime, timedelta
 
 
-
 uri = f"mongodb+srv://{os.environ.get('DB_USERNAME')}:{os.environ.get('DB_PASSWORD')}@px-test.amaelqi.mongodb.net/?appName=px-test"
 print(uri)
 # Create a new client and connect to the server
@@ -23,6 +22,8 @@ recipe = db['recipe']
 
 event_collection = db['events']
 processed_messages_collection = db['processed_messages']
+users_collection = db['users']
+sessions_collection = db['sessions']
 
 
 def get_time_cutoff(time_range):
@@ -231,3 +232,194 @@ def query_events(mode="limit", limit=100):
         )
 
     return []
+
+
+# ============================================================================
+# USER AUTHENTICATION FUNCTIONS
+# ============================================================================
+
+def create_user(username, email, password_hash):
+    """
+    Create a new user in the database.
+    
+    Args:
+        username (str): Username
+        email (str): Email address
+        password_hash (str): Hashed password
+    
+    Returns:
+        dict: Created user document (without password) or None if user exists
+    """
+    try:
+        # Check if user already exists
+        existing_user = users_collection.find_one({
+            "$or": [
+                {"username": username},
+                {"email": email}
+            ]
+        })
+        
+        if existing_user:
+            return None  # User already exists
+        
+        # Create new user
+        user = {
+            "username": username,
+            "email": email,
+            "password_hash": password_hash,
+            "created_at": datetime.now(UTC).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
+            "is_active": True
+        }
+        
+        result = users_collection.insert_one(user)
+        user['_id'] = str(result.inserted_id)
+        # Remove password hash from return
+        user.pop('password_hash', None)
+        return user
+        
+    except Exception as e:
+        print(f"Error creating user: {e}")
+        raise e
+
+
+def get_user_by_username(username):
+    """
+    Get user by username.
+    
+    Args:
+        username (str): Username
+    
+    Returns:
+        dict: User document or None
+    """
+    try:
+        user = users_collection.find_one({"username": username})
+        if user:
+            user['_id'] = str(user['_id'])
+        return user
+    except Exception as e:
+        print(f"Error getting user by username: {e}")
+        return None
+
+
+def get_user_by_email(email):
+    """
+    Get user by email.
+    
+    Args:
+        email (str): Email address
+    
+    Returns:
+        dict: User document or None
+    """
+    try:
+        user = users_collection.find_one({"email": email})
+        if user:
+            user['_id'] = str(user['_id'])
+        return user
+    except Exception as e:
+        print(f"Error getting user by email: {e}")
+        return None
+
+
+def get_user_by_id(user_id):
+    """
+    Get user by ID.
+    
+    Args:
+        user_id (str): User ID
+    
+    Returns:
+        dict: User document (without password) or None
+    """
+    try:
+        from bson import ObjectId
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if user:
+            user['_id'] = str(user['_id'])
+            user.pop('password_hash', None)  # Remove password hash
+        return user
+    except Exception as e:
+        print(f"Error getting user by ID: {e}")
+        return None
+
+
+def save_session(user_id, token, expires_at):
+    """
+    Save a user session (token) in the database.
+    
+    Args:
+        user_id (str): User ID
+        token (str): JWT token
+        expires_at (str): Expiration timestamp (ISO format)
+    
+    Returns:
+        bool: True if successful
+    """
+    try:
+        session = {
+            "user_id": user_id,
+            "token": token,
+            "expires_at": expires_at,
+            "created_at": datetime.now(UTC).isoformat(),
+            "is_active": True
+        }
+        sessions_collection.insert_one(session)
+        return True
+    except Exception as e:
+        print(f"Error saving session: {e}")
+        return False
+
+
+def get_session(token):
+    """
+    Get session by token.
+    
+    Args:
+        token (str): JWT token
+    
+    Returns:
+        dict: Session document or None
+    """
+    try:
+        session = sessions_collection.find_one({
+            "token": token,
+            "is_active": True
+        })
+        if session:
+            # Check if session is expired
+            expires_at = datetime.fromisoformat(session['expires_at'].replace('Z', '+00:00'))
+            if datetime.now(UTC) > expires_at:
+                # Deactivate expired session
+                sessions_collection.update_one(
+                    {"token": token},
+                    {"$set": {"is_active": False}}
+                )
+                return None
+            session['_id'] = str(session['_id'])
+        return session
+    except Exception as e:
+        print(f"Error getting session: {e}")
+        return None
+
+
+def deactivate_session(token):
+    """
+    Deactivate a session (logout).
+    
+    Args:
+        token (str): JWT token
+    
+    Returns:
+        bool: True if successful
+    """
+    try:
+        result = sessions_collection.update_one(
+            {"token": token},
+            {"$set": {"is_active": False, "logged_out_at": datetime.now(UTC).isoformat()}}
+        )
+        return result.modified_count > 0
+    except Exception as e:
+        print(f"Error deactivating session: {e}")
+        return False

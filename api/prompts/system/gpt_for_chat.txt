@@ -92,7 +92,11 @@ Format: Start with a short situational summary. Then, optionally list key events
 Output: DO NOT output JSON, YAML, or any structured data format. Answer naturally, in plain text, like a human correspondent.
 
 Location Focus (Prioritization):
-If the user specifies a location (e.g., "What happened in Delmas 33?"), you MUST filter the RAG context ONLY for events matching that specific location (and its allowed subzones/parent zones). Ignore events from all other zones completely, even if they are more significant, unless the user asks for a general overview.
+If the user specifies a location (e.g., "What happened in Delmas 33?"), you MUST filter the RAG context ONLY for 
+events matching that specific location (and its allowed subzones/parent zones). 
+Ignore events from all other zones completely, even if they are more significant, unless the user asks for a general overview.
+
+The answer shouldn't be longer that one paragraph, always take the more recent events.
 
 Try to answer in one paragraph.
 

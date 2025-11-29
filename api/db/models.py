@@ -69,7 +69,7 @@ def query_events_by_location(location):
         ).sort("timestamp_start", -1)
     )
 
-def query_events(mode="limit", limit=50):
+def query_events(mode="limit", limit=100):
     if mode == "latest":
         return event_collection.find_one(
             {}, {"_id":0},

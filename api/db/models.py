@@ -24,6 +24,7 @@ event_collection = db['events']
 processed_messages_collection = db['processed_messages']
 users_collection = db['users']
 sessions_collection = db['sessions']
+notifications_collection = db['notifications']
 
 
 def get_time_cutoff(time_range):
@@ -167,9 +168,26 @@ def save_processed_messages(preprocessed_message):
 
 
 def save_event(analysed_events):
+    """
+    Save events to database and return the saved events with their IDs.
+    
+    Args:
+        analysed_events (dict): Dictionary with 'events' list
+    
+    Returns:
+        dict: Dictionary with 'result' (InsertManyResult) and 'events' (with _id added)
+    """
     try:
         result = event_collection.insert_many(analysed_events['events'])
-        return result
+        
+        # Add _id to events for notification creation
+        for i, event in enumerate(analysed_events['events']):
+            event['_id'] = str(result.inserted_ids[i])
+        
+        return {
+            'result': result,
+            'events': analysed_events['events']
+        }
     except Exception as e:
         raise e
 
@@ -423,3 +441,210 @@ def deactivate_session(token):
     except Exception as e:
         print(f"Error deactivating session: {e}")
         return False
+
+
+# ============================================================================
+# NOTIFICATION FUNCTIONS (SIMPLIFIED)
+# ============================================================================
+
+def create_notification(user_id, event):
+    """
+    Create a notification for a user from an event.
+    
+    Args:
+        user_id (str): User ID
+        event (dict): Event document
+    
+    Returns:
+        dict: Created notification document
+    """
+    try:
+        event_type = event.get('event_type', 'event')
+        location = event.get('location', 'Unknown')
+        severity = event.get('severity', 'unknown')
+        summary = event.get('summary', 'New event')
+        
+        notification = {
+            "user_id": user_id,
+            "event_id": str(event.get('_id', '')),
+            "title": f"{event_type.title()} in {location}",
+            "message": summary,
+            "location": location,
+            "event_type": event_type,
+            "severity": severity,
+            "is_read": False,
+            "created_at": datetime.now(UTC).isoformat()
+        }
+        
+        result = notifications_collection.insert_one(notification)
+        notification['_id'] = str(result.inserted_id)
+        return notification
+        
+    except Exception as e:
+        print(f"Error creating notification: {e}")
+        return None
+
+
+def get_user_notifications(user_id, limit=50, unread_only=False):
+    """
+    Get notifications for a user.
+    
+    Args:
+        user_id (str): User ID
+        limit (int): Maximum number of notifications to return
+        unread_only (bool): If True, only return unread notifications
+    
+    Returns:
+        list: List of notification documents
+    """
+    try:
+        query = {"user_id": user_id}
+        if unread_only:
+            query["is_read"] = False
+        
+        notifications = list(
+            notifications_collection.find(query)
+            .sort("created_at", -1)
+            .limit(limit)
+        )
+        
+        # Convert ObjectId to string
+        for notif in notifications:
+            notif['_id'] = str(notif['_id'])
+        
+        return notifications
+        
+    except Exception as e:
+        print(f"Error getting user notifications: {e}")
+        return []
+
+
+def mark_notification_read(notification_id, user_id):
+    """
+    Mark a notification as read.
+    
+    Args:
+        notification_id (str): Notification ID
+        user_id (str): User ID (for security)
+    
+    Returns:
+        bool: True if successful
+    """
+    try:
+        from bson import ObjectId
+        
+        result = notifications_collection.update_one(
+            {
+                "_id": ObjectId(notification_id),
+                "user_id": user_id
+            },
+            {
+                "$set": {
+                    "is_read": True,
+                    "read_at": datetime.now(UTC).isoformat()
+                }
+            }
+        )
+        
+        return result.modified_count > 0
+        
+    except Exception as e:
+        print(f"Error marking notification as read: {e}")
+        return False
+
+
+def mark_all_notifications_read(user_id):
+    """
+    Mark all notifications as read for a user.
+    
+    Args:
+        user_id (str): User ID
+    
+    Returns:
+        int: Number of notifications marked as read
+    """
+    try:
+        result = notifications_collection.update_many(
+            {
+                "user_id": user_id,
+                "is_read": False
+            },
+            {
+                "$set": {
+                    "is_read": True,
+                    "read_at": datetime.now(UTC).isoformat()
+                }
+            }
+        )
+        
+        return result.modified_count
+        
+    except Exception as e:
+        print(f"Error marking all notifications as read: {e}")
+        return 0
+
+
+def delete_notification(notification_id, user_id):
+    """
+    Delete a notification.
+    
+    Args:
+        notification_id (str): Notification ID
+        user_id (str): User ID (for security)
+    
+    Returns:
+        bool: True if successful
+    """
+    try:
+        from bson import ObjectId
+        
+        result = notifications_collection.delete_one({
+            "_id": ObjectId(notification_id),
+            "user_id": user_id
+        })
+        
+        return result.deleted_count > 0
+        
+    except Exception as e:
+        print(f"Error deleting notification: {e}")
+        return False
+
+
+def get_unread_count(user_id):
+    """
+    Get count of unread notifications for a user.
+    
+    Args:
+        user_id (str): User ID
+    
+    Returns:
+        int: Number of unread notifications
+    """
+    try:
+        count = notifications_collection.count_documents({
+            "user_id": user_id,
+            "is_read": False
+        })
+        return count
+        
+    except Exception as e:
+        print(f"Error getting unread count: {e}")
+        return 0
+
+
+
+
+def get_all_active_users():
+    """
+    Get all active user IDs for notifications.
+    Simple version - notify all active users.
+    
+    Returns:
+        list: List of active user IDs
+    """
+    try:
+        users = users_collection.find({"is_active": True}, {"_id": 1})
+        return [str(user['_id']) for user in users]
+    except Exception as e:
+        print(f"Error getting active users: {e}")
+        return []

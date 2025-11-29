@@ -6,7 +6,6 @@ from flask import jsonify
 from .db.models import create_user, get_user_by_username, get_user_by_email, save_session, get_session, deactivate_session, get_user_by_id
 
 # JWT Secret Key - MUST be set as environment variable in production
-os.environ["JWT_SECRET"] = "Mau69bVU86BBji5TejvzwYTJ6XAJW2+gB17bEHbEKH/BXLZ1WMsd2vZRRiKurQQYAglIzqbI4NPSv5qopBquHw=="
 JWT_SECRET = os.environ.get("JWT_SECRET")
 
 JWT_ALGORITHM = "HS256"

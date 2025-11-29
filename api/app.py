@@ -210,10 +210,21 @@ def receive_messages():
         analysed_events = analyse_msg(preprocessed_messages)
         
         # 3. Stockage dans la DB
-        
-        save_status = save_event(analysed_events)
+        save_result = save_event(analysed_events)
 
-        if save_status:
+        if save_result and save_result.get('result'):
+            # 4. Create notifications for all active users
+            from .db.models import get_all_active_users, create_notification
+            
+            saved_events = save_result.get('events', [])
+            active_users = get_all_active_users()
+            
+            for event in saved_events:
+                # Only notify for critical or high severity events
+                if event.get('severity') in ['critical', 'high']:
+                    for user_id in active_users:
+                        create_notification(user_id, event)
+            
             return {"status": "ok", "Message": "Event save successfully"}, 200
         else:
             abort(500, description="Event not saved")
@@ -221,5 +232,95 @@ def receive_messages():
     except Exception as e:
         print("Error:", e)
         abort(500, description=str(e))
+
+
+# ============================================================================
+# NOTIFICATION ENDPOINTS
+# ============================================================================
+
+def get_authenticated_user():
+    """Helper to get authenticated user from token."""
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return None, {"status": "error", "message": "Authorization token required"}, 401
+    
+    token = auth_header.split(' ')[1]
+    user = get_current_user(token)
+    
+    if not user:
+        return None, {"status": "error", "message": "Invalid or expired token"}, 401
+    
+    return user, None, None
+
+
+
+
+
+
+@app.route('/notifications/<notification_id>/read', methods=['POST'])
+def mark_notification_read_endpoint(notification_id):
+    """Mark a notification as read."""
+    if request.method != POST:
+        abort(404, description="Expected POST request")
+    
+    try:
+        user, error, status = get_authenticated_user()
+        if error:
+            return error, status
+        
+        success = mark_notification_read(notification_id, user['_id'])
+        
+        if success:
+            return {"status": "ok", "message": "Notification marked as read"}, 200
+        else:
+            return {"status": "error", "message": "Notification not found"}, 404
+        
+    except Exception as e:
+        print(f"Mark notification read error: {e}")
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/notifications/read-all', methods=['POST'])
+def mark_all_notifications_read_endpoint():
+    """Mark all notifications as read."""
+    if request.method != POST:
+        abort(404, description="Expected POST request")
+    
+    try:
+        user, error, status = get_authenticated_user()
+        if error:
+            return error, status
+        
+        count = mark_all_notifications_read(user['_id'])
+        return {"status": "ok", "message": f"Marked {count} notifications as read"}, 200
+        
+    except Exception as e:
+        print(f"Mark all notifications read error: {e}")
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/notifications/<notification_id>', methods=['DELETE'])
+def delete_notification_endpoint(notification_id):
+    """Delete a notification."""
+    if request.method != 'DELETE':
+        abort(404, description="Expected DELETE request")
+    
+    try:
+        user, error, status = get_authenticated_user()
+        if error:
+            return error, status
+        
+        success = delete_notification(notification_id, user['_id'])
+        
+        if success:
+            return {"status": "ok", "message": "Notification deleted"}, 200
+        else:
+            return {"status": "error", "message": "Notification not found"}, 404
+        
+    except Exception as e:
+        print(f"Delete notification error: {e}")
+        return {"status": "error", "message": str(e)}, 500
+
+
 
         

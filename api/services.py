@@ -22,9 +22,9 @@ def load_prompt(path):
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
-DEEP_SYSTEM_PROMPT = "prompts/system/deepseek_pretriage.txt"
-GPT_SYSTEM_PROMPT = "prompts/system/gpt_analysis.txt"
-DEEPSEEK_CHAT_SYSTEM_PROMPT = "prompts/system/deepseek_for_chat.txt"
+DEEP_SYSTEM_PROMPT = "./prompts/system/deepseek_pretriage.txt"
+GPT_SYSTEM_PROMPT = "./prompts/system/gpt_analysis.txt"
+DEEPSEEK_CHAT_SYSTEM_PROMPT = "./prompts/system/deepseek_for_chat.txt"
 GPT_CHAT_SYSTEM_PROMPT = "prompts/system/gpt_for_chat.txt"
 # USER_PROMPT   = load_prompt("prompts/user/chatbot_query.md")
 

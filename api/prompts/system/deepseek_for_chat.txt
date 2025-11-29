@@ -56,7 +56,7 @@ If the user mentions:
 - “Delmas 40B” → SPECIFIC  
 - “Tabarre 52” → SPECIFIC  
 - “Pétion-Ville” → GENERAL  
-
+- "Lari", "Laria" -> GENERAL
 ----------------------------------------------------------------------
 B) NON-HIERARCHICAL ZONES (NEVER TREATED AS SUBZONES)
 ----------------------------------------------------------------------
@@ -143,7 +143,7 @@ If mixed, choose the dominant language.
 ⚠️ 4. HARD SAFETY RULES
 ======================================================================
 
-- If NO location is detected → `"location": null`
+- If NO location is detected → `"location": general`
 - NEVER invent a location.
 - NEVER guess hierarchy beyond the rules above.
 - Output JSON ONLY — no text before or after.

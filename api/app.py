@@ -15,6 +15,21 @@ def home():
     return "<h1>Welcome To Patrol-X</h1>"
 
 
+@app.route('/chat', methods=['POST'])
+def chat():
+    if request.method == POST:
+        if not request.is_json:
+            abort(400, description="Expected JSON body")
+        try:
+            messages = request.json['prompt']
+            return chat_with_gpt(messages)
+        except Exception as e:
+            print(e)
+            abort(400, description=str(e))
+    else:
+        abort(404, description="Expected POST request")
+
+
 @app.route('/events/latest', methods=['POST', 'GET'])
 def get_events():
     if request.method == GET:
@@ -23,10 +38,19 @@ def get_events():
     else:
         abort(404, description="Expected GET request")
 
-@app.route(f'/events/<location>', methods=['POST', 'GET'])
+@app.route('/events/location/<location>', methods=['GET'])
 def get_events_by_location(location):
-    if request.method == GET:
-        print(location)
+    print(f"\nRequest for location: {location}")
+
+    # 1. Query MongoDB (last 24h + partial match)
+    events_list = query_events_by_location(location)
+    print(f"Events found: {len(events_list)}")
+
+    # 2. Generate RAG summary
+    summary = generate_summary(events_list, location)
+    print(f"Summary generated:\n{summary}")
+    return {"status": "ok", "summary": summary}, 200
+
 
 
 @app.route('/messages', methods=['POST'])

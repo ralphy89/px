@@ -25,7 +25,7 @@ client = OpenAI(
 )
 
 
-model_list = ['grok-4-1-fast-reasoning', 'grok-4-fast-reasoning']  # [analysis_model, preprocessing_model] - both use grok-2
+model_list = ['grok-4-1-fast-reasoning', 'grok-4-fast-reasoning']  # [analysis_model, preprocessing_model] 
 
 def load_prompt(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -531,24 +531,24 @@ def analyse_chat_prompt(preprocessed_message):
         
         # Build user prompt with context
         user_prompt = f"""
-User question context (extracted parameters):
-{json.dumps(preprocessed_message, ensure_ascii=False, indent=2)}
+                    User question context (extracted parameters):
+                    {json.dumps(preprocessed_message, ensure_ascii=False, indent=2)}
 
-Database events (RAG context):
-{events_context}
+                    Database events (RAG context):
+                    {events_context}
 
-Original user question: "{preprocessed_message.get('original_question', '')}"
+                    Original user question: "{preprocessed_message.get('original_question', '')}"
 
-Respond in {preprocessed_message.get('language', 'ht')} language.
-"""
+                    Respond in {preprocessed_message.get('language', 'ht')} language.
+                    """
         
         print(f"Query type: {preprocessed_message.get('query_type')}")
         print(f"Events found: {len(events)}")
         
         completion = client.chat.completions.create(
-            model=model_list[0],  # grok-2 for chat analysis
+            model=model_list[0],  
             messages=[
-                {"role": "system", "content": system_prompt}, 
+                {"role": "system", "content": system_prompt + "\n\nToday's date: " + datetime.now(UTC).strftime("%Y-%m-%d")}, 
                 {"role": "user", "content": user_prompt}
             ]
         )

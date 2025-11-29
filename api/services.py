@@ -65,7 +65,7 @@ def analyse_chat_prompt(preprocessed_message):
             """
         
         completion = client.chat.completions.create(
-            model=model_list[1],
+            model=model_list[0],
             messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
         )
 

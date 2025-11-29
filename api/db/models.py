@@ -210,7 +210,7 @@ def query_events_by_location(location):
     )
 
 
-def query_events(mode="last_24h", limit=20):
+def query_events(mode="limit", limit=10):
     """
     Query events with different modes.
     

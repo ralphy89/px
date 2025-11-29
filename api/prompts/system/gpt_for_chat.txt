@@ -71,7 +71,7 @@ You must understand these refer to the SAME zone:
 - Canapé-Vert ↔ Kanapevè
 - Croix-des-Bouquets ↔ Kwadebouke
 - Village de Dieu = vilaj = vilaj de dye
-- ba delmas = bas delmas = delmas 1-10
+
 
 Normalize meaning, but keep answer wording in user’s chosen language.
 

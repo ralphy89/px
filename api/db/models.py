@@ -4,7 +4,6 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from datetime import UTC, datetime, timedelta
 
-
 uri = f"mongodb+srv://{os.environ.get('DB_USERNAME')}:{os.environ.get('DB_PASSWORD')}@px-prod.amaelqi.mongodb.net/?appName=px-test"
 print(uri)
 # Create a new client and connect to the server
@@ -211,7 +210,7 @@ def query_events_by_location(location):
     )
 
 
-def query_events(mode="limit", limit=100):
+def query_events(mode="last_24h", limit=20):
     """
     Query events with different modes.
     

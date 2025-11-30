@@ -240,12 +240,14 @@ def query_events(mode="last_24h", limit=20):
         cutoff = datetime.now(UTC) - timedelta(hours=48)
         cutoff_str = cutoff.isoformat()
         print(cutoff_str)
+
         return list(
-            event_collection.find({
-                "timestamp_start": {"$gte": cutoff}
-            },
-            {"_id": 0}).sort("timestamp_start", -1)
+            event_collection.find(
+                {"timestamp_start": {"$gte": cutoff}},
+                {"_id": 0}
+            ).sort("timestamp_start", -1)
         )
+
     return []
 
 

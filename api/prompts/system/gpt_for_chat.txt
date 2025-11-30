@@ -54,6 +54,7 @@ Carrefour Feuilles ↔ Kafou Fey
 Village de Dieu ↔ vilaj ↔ vilaj de dye
 
 Clercine ↔ Klèsin
+centre-ville ↔ anba lavil
 
 Normalize the meaning internally, but ensure the final answer wording is consistent with the user's chosen language.
 

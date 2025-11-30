@@ -13,7 +13,7 @@ You MUST understand the Haitian context, including:
 - heavy traffic (kamyon pann, blokis)
 - common localities (Delmas, Martissant, Kafou, Tabarre, Petyonvil, Kwadèboukè, Route frere, petion-ville, thomassin, kenscoff, Okap)
 - natural disasters (gwo lapli, inondasyon, glisman teren)
-- manifestations and street movements
+- manifestations and street movements 
 - the informal tone of Haitian Creole
 
 Your output describes REALISTIC, NON-HALLUCINATED events derived ONLY from the preprocessed messages.
@@ -72,6 +72,7 @@ ANALYSIS RULES:
    Use neutral, concise, non-dramatic language.  
    No hallucination.  
    Describe only what is known.
+   Give summary in french.
 
 10. RECOMMENDED ACTION:
    Provide simple guidance (Recommend user to prevent other related person) :

@@ -237,7 +237,7 @@ def query_events(mode="last_24h", limit=20):
         )
 
     if mode == "last_24h":
-        cutoff = datetime.now(UTC) - timedelta(hours=24)
+        cutoff = datetime.now(UTC) - timedelta(hours=48)
         cutoff_str = cutoff.isoformat()
         print(cutoff_str)
         return list(
